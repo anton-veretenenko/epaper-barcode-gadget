@@ -33,6 +33,7 @@ void sleep_deep();
 
 RTC_DATA_ATTR bool sleeping = false;
 RTC_DATA_ATTR int image_index = 0;
+RTC_DATA_ATTR long last_touch = 0;
 volatile bool touch_trigger = false;
 volatile int touch_pin = -1;
 
@@ -85,14 +86,14 @@ void touch_init()
     ESP_ERROR_CHECK(touch_pad_init());
     touch_pad_set_fsm_mode(TOUCH_FSM_MODE_TIMER);
     touch_pad_set_voltage(TOUCH_HVOLT_2V7, TOUCH_LVOLT_0V5, TOUCH_HVOLT_ATTEN_1V);
-    touch_pad_config(0, 0);
+    touch_pad_config(TOUCH_PAD_NUM0, 0);
     touch_pad_filter_start(20);
 
     // init threshold
     uint16_t touch_value;
-    touch_pad_read_filtered(0, &touch_value);
+    touch_pad_read_filtered(TOUCH_PAD_NUM0, &touch_value);
     printf("touch pin 0 no touch value: %d\n", touch_value);
-    touch_pad_set_thresh(0, touch_value * 2 / 3);
+    touch_pad_set_thresh(TOUCH_PAD_NUM0, touch_value * 2 / 3);
     touch_pad_set_trigger_mode(TOUCH_TRIGGER_BELOW);
     touch_pad_isr_register(touch_isr, NULL);
     // touch_pad_intr_enable();
@@ -122,6 +123,7 @@ static void main_task(void *)
         if (touch_trigger && touch_pin != -1) {
             // process touch event
             ESP_LOGI(TAG, "Touch: 0");
+            last_touch = esp_timer_get_time();
             led_state = ~led_state & 1;
             gpio_set_level(GPIO_LED, led_state);
             touch_trigger = false;
@@ -190,25 +192,42 @@ void sleep_deep()
 
 void app_main() {
 
+    char *TAG = "app_main";
     // get wakeup reason
     esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
+    int wakeup_pin = esp_sleep_get_touchpad_wakeup_status();
 
     power_init();
     nvs_init();
     display_gpio_init();
     fs_init();
-    vTaskDelay(4000 / portTICK_PERIOD_MS);
     printf("INIT\n");
-
-    if (wakeup_reason == ESP_SLEEP_WAKEUP_TOUCHPAD) {
-        printf("Woken by touchpad!\n");
-    }
-
     touch_init();
     display_init();
+
+    if (wakeup_reason == ESP_SLEEP_WAKEUP_TOUCHPAD) {
+        ESP_LOGI(TAG, "Woken by Touch: %d", wakeup_pin);
+        if (wakeup_pin == TOUCH_PAD_NUM0) {
+            last_touch = esp_timer_get_time();
+            touch_trigger = true;
+            touch_pin = 0;
+        }
+    } else {
+        // add delay to let open terminal after flashing
+        vTaskDelay(4000 / portTICK_PERIOD_MS);
+    }
 
     fl_init(BARCODES_PATH);
 
     xTaskCreate(main_task, "main_task", 4096, NULL, 5, NULL);
-    // sleep_deep();
+    while (true) {
+        vTaskDelay(1000 / portTICK_PERIOD_MS);
+        if (last_touch == 0) {
+            last_touch = esp_timer_get_time();
+        }
+        if (esp_timer_get_time() - last_touch > 30 * 1000 * 1000) {
+            ESP_LOGI("sleep", "No touch for 30 seconds");
+            sleep_deep();
+        }
+    }
 }
