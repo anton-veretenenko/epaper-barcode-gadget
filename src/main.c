@@ -140,6 +140,11 @@ static void main_task(void *)
             //     display_text_center_at(5, " CLIENT ");
             //     display_finish(true);
             // }
+            size_t total_bytes, used_bytes;
+            esp_littlefs_info("storage", &total_bytes, &used_bytes);
+            ESP_LOGI(TAG, "Total bytes: %d, Used bytes: %d", total_bytes, used_bytes);
+            uint16_t used_percent = (uint16_t)((float)used_bytes / total_bytes * 100);
+            if (used_percent > 99) used_percent = 99;
             display_start(true);
             fl_file_t file;
             if (fl_next(&file)) {
@@ -156,7 +161,15 @@ static void main_task(void *)
                     strcat(str_display, file.name);
                     strcat(str_display, " ");
                     display_text_center_at(5, str_display);
-                    display_text_at(200-4*8, 200-8, " 99% ");
+                    memset(str_display, 0, 5+1);
+                    sprintf(str_display, " %d%%", 100-used_percent);
+                    strcat(str_display, "\x80");
+                    display_text_at(200-strlen(str_display)*8, 200-16, str_display);
+                    memset(str_display, 0, 5+1);
+                    strcat(str_display, " ");
+                    strcat(str_display, "99%");
+                    strcat(str_display, "\x7F");
+                    display_text_at(200-strlen(str_display)*8, 200-8, str_display);
                     free(str_display);
                 } else {
                     ESP_LOGE(TAG, "Failed to open file: %s", path);

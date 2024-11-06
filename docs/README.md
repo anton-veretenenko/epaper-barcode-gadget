@@ -2,7 +2,7 @@
 
 ## Hardware
 - Wemos Lolin32 Lite board with ESP32 REV 1
-- WeAct Studio ePaper 1.54" Module
+- WeAct Studio ePaper 1.54" Module with SSD1681 driver ic
 - 043040/403040/603040 lipo battery
 - custom case with touch pads
 
@@ -15,6 +15,7 @@
 - https://rop.nl/truetype2gfx/
 - http://www.rinkydinkelectronics.com/r_fonts.php
 - https://oleddisplay.squix.ch/
+- https://www.pentacom.jp/pentacom/bitfontmaker2/
 
 ## Icons
 - https://www.flaticon.com/authors/iconmarketpk
