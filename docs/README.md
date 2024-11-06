@@ -1,5 +1,11 @@
 ## Docs
 
+## Hardware
+- Wemos Lolin32 Lite board with ESP32 REV 1
+- WeAct Studio ePaper 1.54" Module
+- 043040/403040/603040 lipo battery
+- custom case with touch pads
+
 ## Bitmap converters
 - https://javl.github.io/image2cpp/
 - https://lvgl.io/tools/imageconverter
@@ -12,3 +18,4 @@
 
 ## Icons
 - https://www.flaticon.com/authors/iconmarketpk
+- https://www.flaticon.com/authors/icon-small
