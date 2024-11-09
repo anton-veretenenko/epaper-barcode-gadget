@@ -5,8 +5,6 @@
 #include "esp_system.h"
 #include "esp_log.h"
 
-#define FL_MAX_FILES 50
-#define FL_MAX_NAME (LFS_NAME_MAX)
 #define TAG "file_roller"
 
 typedef struct
@@ -78,4 +76,48 @@ bool fl_prev(fl_file_t *fl_file)
     *fl_file = fl_files.files[fl_files.current];
     memcpy(fl_last_file, fl_file->name, strlen(fl_file->name)+1);
     return true;
+}
+
+bool fl_delete(char *name)
+{
+    char *path = malloc(strlen(BARCODES_PATH) + strlen(name) + 1);
+    strcpy(path, BARCODES_PATH);
+    strcat(path, name);
+    int rc = remove(path);
+    free(path);
+    fl_deinit();
+    fl_init(BARCODES_PATH);
+    return rc;
+}
+
+FILE *fl_init_write(char *name)
+{
+    char *path = malloc(strlen(BARCODES_PATH) + strlen(name) + 1);
+    strcpy(path, BARCODES_PATH);
+    strcat(path, name);
+    FILE *file = fopen(path, "wb");
+    free(path);
+    return file;
+}
+
+bool fl_space_available(uint16_t size)
+{
+    size_t total_bytes, used_bytes;
+    esp_littlefs_info("storage", &total_bytes, &used_bytes);
+    return total_bytes - used_bytes > size;
+}
+
+bool fl_exists(char *name)
+{
+    bool exists = false;
+    char *path = malloc(strlen(BARCODES_PATH) + strlen(name) + 1);
+    strcpy(path, BARCODES_PATH);
+    strcat(path, name);
+    FILE *file = fopen(path, "rb");
+    if (file) {
+        exists = true;
+        fclose(file);
+    }
+    free(path);
+    return exists;
 }

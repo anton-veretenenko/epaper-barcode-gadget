@@ -19,17 +19,17 @@
 #include "driver/touch_pad.h"
 #include "display.h"
 #include "file_roller.h"
+#include "bluetooth.h"
 
 #define GPIO_LED 22
-#define BARCODES_PATH "/storage/barcode/"
-void display_gpio_init();
-void power_init();
-void nvs_init();
-void fs_init();
-void touch_init();
+static void display_gpio_init();
+static void power_init();
+static void nvs_init();
+static void fs_init();
+static void touch_init();
 static void touch_isr(void* arg);
 static void main_task(void *);
-void sleep_deep();
+static void sleep_deep();
 
 RTC_DATA_ATTR bool sleeping = false;
 RTC_DATA_ATTR int image_index = 0;
@@ -37,7 +37,7 @@ RTC_DATA_ATTR long last_touch = 0;
 volatile bool touch_trigger = false;
 volatile int touch_pin = -1;
 
-void display_gpio_init() {
+static void display_gpio_init() {
     gpio_config_t io_conf;
     io_conf.intr_type = GPIO_INTR_DISABLE;
     io_conf.mode = GPIO_MODE_OUTPUT;
@@ -48,7 +48,7 @@ void display_gpio_init() {
     gpio_set_level(GPIO_LED, 1);
 }
 
-void power_init()
+static void power_init()
 {
     esp_pm_config_t pm_config = {
         .max_freq_mhz = 240,
@@ -58,7 +58,7 @@ void power_init()
     esp_pm_configure(&pm_config);
 }
 
-void nvs_init()
+static void nvs_init()
 {
     esp_err_t ret = nvs_flash_init();
     if (ret == ESP_ERR_NVS_NO_FREE_PAGES || ret == ESP_ERR_NVS_NEW_VERSION_FOUND) {
@@ -68,7 +68,7 @@ void nvs_init()
     ESP_ERROR_CHECK( ret );
 }
 
-void fs_init()
+static void fs_init()
 {
     esp_vfs_littlefs_conf_t conf = {
         .base_path = "/storage",
@@ -81,7 +81,7 @@ void fs_init()
     ESP_ERROR_CHECK( esp_vfs_littlefs_register(&conf) );
 }
 
-void touch_init()
+static void touch_init()
 {
     ESP_ERROR_CHECK(touch_pad_init());
     touch_pad_set_fsm_mode(TOUCH_FSM_MODE_TIMER);
@@ -195,7 +195,7 @@ static void main_task(void *)
     }
 }
 
-void sleep_deep()
+static void sleep_deep()
 {
     vTaskDelay(10000 / portTICK_PERIOD_MS);
     ESP_LOGI("sleep", "Going to sleep");
@@ -217,6 +217,8 @@ void app_main() {
     printf("INIT\n");
     touch_init();
     display_init();
+    
+    bluetooth_start();
 
     if (wakeup_reason == ESP_SLEEP_WAKEUP_TOUCHPAD) {
         ESP_LOGI(TAG, "Woken by Touch: %d", wakeup_pin);
@@ -235,12 +237,12 @@ void app_main() {
     xTaskCreate(main_task, "main_task", 4096, NULL, 5, NULL);
     while (true) {
         vTaskDelay(1000 / portTICK_PERIOD_MS);
-        if (last_touch == 0) {
-            last_touch = esp_timer_get_time();
-        }
-        if (esp_timer_get_time() - last_touch > 30 * 1000 * 1000) {
-            ESP_LOGI("sleep", "No touch for 30 seconds");
-            sleep_deep();
-        }
+        // if (last_touch == 0) {
+        //     last_touch = esp_timer_get_time();
+        // }
+        // if (esp_timer_get_time() - last_touch > 30 * 1000 * 1000) {
+        //     ESP_LOGI("sleep", "No touch for 30 seconds");
+        //     sleep_deep();
+        // }
     }
 }
