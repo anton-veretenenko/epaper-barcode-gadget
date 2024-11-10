@@ -180,7 +180,8 @@ void app_main() {
     vTaskDelay(4000 / portTICK_PERIOD_MS);
     fs_init();
     printf("INIT\n");
-    touchpad_init(0 | (1 << TOUCH_PAD_NUM0));
+    touchpad_init(0 | (1 << TOUCH_PAD_NUM0) | (1 << TOUCH_PAD_NUM9));
+    // touchpad_init(0 | (1 << TOUCH_PAD_NUM0));
     display_init();
     
     bluetooth_start();
