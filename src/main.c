@@ -20,6 +20,8 @@
 #include "file_roller.h"
 #include "bluetooth.h"
 #include "touchpad.h"
+#include "apps_controller.h"
+#include "menu.h"
 
 #define GPIO_LED 22
 static void gpio_init();
@@ -199,6 +201,10 @@ void app_main() {
     }
 
     fl_init(BARCODES_PATH);
+
+    apps_controller_init(TOUCH_PAD_NUM0);
+    apps_controller_add_app(&menu_app);
+    apps_controller_activate_app("menu");
 
     xTaskCreate(main_task, "main_task", 4096, NULL, 5, NULL);
     while (true) {

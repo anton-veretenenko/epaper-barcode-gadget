@@ -7,7 +7,7 @@
 #include "esp_log.h"
 #include "driver/gpio.h"
 
-const char *TAG = "TOUCHPAD";
+static const char *TAG = "TOUCHPAD";
 RTC_DATA_ATTR long last_touch = 0;
 volatile bool touch_trigger = false;
 volatile int touch_pin = -1;
