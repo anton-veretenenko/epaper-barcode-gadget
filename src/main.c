@@ -22,6 +22,8 @@
 #include "touchpad.h"
 #include "apps_controller.h"
 #include "menu.h"
+#include "app_bluetooth.h"
+#include "app_barcode.h"
 
 #define GPIO_LED 22
 static void gpio_init();
@@ -186,7 +188,7 @@ void app_main() {
     // touchpad_init(0 | (1 << TOUCH_PAD_NUM0));
     display_init();
     
-    bluetooth_start();
+    // bluetooth_start();
 
     if (wakeup_reason == ESP_SLEEP_WAKEUP_TOUCHPAD) {
         ESP_LOGI(TAG, "Woken by Touch: %d", wakeup_pin);
@@ -203,7 +205,9 @@ void app_main() {
     fl_init(BARCODES_PATH);
 
     apps_controller_init(TOUCH_PAD_NUM0);
-    apps_controller_add_app(&menu_app);
+    apps_controller_add_app(&app_menu);
+    apps_controller_add_app(&app_barcode);
+    apps_controller_add_app(&app_bluetooth);
     apps_controller_activate_app("menu");
 
     xTaskCreate(main_task, "main_task", 4096, NULL, 5, NULL);

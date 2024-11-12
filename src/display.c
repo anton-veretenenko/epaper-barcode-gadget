@@ -25,7 +25,7 @@ static void display_send_cmd_byte_only(uint8_t cmd);
 static void display_send_data_byte_only(uint8_t data);
 static void display_send_data(uint8_t *data, uint16_t len);
 static void display_wait_busy();
-static void display_update(bool fast);
+// static void display_update(bool fast);
 // static void display_clear_window(uint8_t x, uint8_t y, uint8_t width, uint8_t height);
 
 display_cmd_t display_init_geometry[] = {
@@ -36,6 +36,7 @@ display_cmd_t display_init_geometry[] = {
     {0x45, false, false, 4, {0, 0, (DISPLAY_HEIGHT-1)%256, (DISPLAY_HEIGHT-1)/256}}, // 0 to number of lines
     {0x3C, false, false, 1, {0x80}}, // screen border, white - 0x05, black - 0x00, 0xc0 - hi-z, do not refresh border(noisy), 0x80 - vcom, do not refresh border
     {0x18, false, false, 1, {0x80}}, // internal temperature sensor
+    {0x21, false, false, 1, {0x80}}, // inverse RED channel
 };
 
 display_cmd_t display_init_geometry_bitmap[] = {
@@ -46,6 +47,7 @@ display_cmd_t display_init_geometry_bitmap[] = {
     {0x45, false, false, 4, {0, 0, (DISPLAY_HEIGHT-1)%256, (DISPLAY_HEIGHT-1)/256}}, // 0 to number of lines
     {0x3C, false, false, 1, {0x80}}, // screen border, white - 0x05, black - 0x00, 0xc0 - hi-z, do not refresh border(noisy), 0x80 - vcom, do not refresh border
     {0x18, false, false, 1, {0x80}}, // internal temperature sensor
+    {0x21, false, false, 1, {0x80}}, // inverse RED channel
 };
 
 display_cmd_t display_init_cmds[] = {
@@ -66,6 +68,8 @@ display_cmd_t display_init_cmds[] = {
 
 // faster update
 display_cmd_t display_init_fast_cmds[] = {
+    {0x4e, false, false, 1, {0x00}}, // start x
+    {0x4f, false, true, 2, {0x00, 0x00}}, // start y
     {0x22, false, false, 1, {0xb1}}, // b1 - mode 1 load temp + lut, b9 - mode 2 load temp + lut
     {0x20, false, true, 0, {}}, // update display
     {0x1a, false, false, 2, {0x5a, 0x00}}, // write temperature
@@ -211,7 +215,7 @@ static void display_init_hw(bool fast)
     }
 }
 
-static void display_update(bool fast)
+void display_update(bool fast)
 {
     if (fast) {
         for (int i = 0; i < sizeof(display_update_fast_cmds) / sizeof(display_cmd_t); i++) {
@@ -234,6 +238,15 @@ void display_start(bool fast)
 void display_finish(bool fast)
 {
     display_update(fast);
+    display_sleep();
+    spi_device_release_bus(display_spi_device);
+}
+
+void display_finish_partial()
+{
+    for (int i = 0; i < sizeof(display_update_window_cmds) / sizeof(display_cmd_t); i++) {
+        display_send_cmd(&display_update_window_cmds[i]);
+    }
     display_sleep();
     spi_device_release_bus(display_spi_device);
 }
@@ -300,6 +313,14 @@ void display_fill_black()
     for (int i = 0; i < DISPLAY_WIDTH*DISPLAY_HEIGHT/8; i++) {
         display_send_data_byte_only(0x00);
     }
+    // reset pos to 0,0
+    for (int i = 0; i < sizeof(display_init_cmds) / sizeof(display_cmd_t); i++) {
+        display_send_cmd(&display_init_cmds[i]);
+    }
+    display_send_cmd_byte_only(0x26);
+    for (int i = 0; i < DISPLAY_WIDTH*DISPLAY_HEIGHT/8; i++) {
+        display_send_data_byte_only(0x00);
+    }
 }
 
 void display_fill_white()
@@ -307,6 +328,14 @@ void display_fill_white()
     display_cmd_t cmd_data_dir = {0x11, false, false, 1, {0x03}}; // x inc, y inc
     display_send_cmd(&cmd_data_dir);
     display_send_cmd_byte_only(0x24);
+    for (int i = 0; i < DISPLAY_WIDTH*DISPLAY_HEIGHT/8; i++) {
+        display_send_data_byte_only(0xff);
+    }
+    // reset pos to 0,0
+    for (int i = 0; i < sizeof(display_init_cmds) / sizeof(display_cmd_t); i++) {
+        display_send_cmd(&display_init_cmds[i]);
+    }
+    display_send_cmd_byte_only(0x26);
     for (int i = 0; i < DISPLAY_WIDTH*DISPLAY_HEIGHT/8; i++) {
         display_send_data_byte_only(0xff);
     }
@@ -347,7 +376,86 @@ void display_show_bitmap_file(FILE *file, const uint8_t width, const uint8_t hei
         if (read > 0) {
             display_send_data_byte_only(data);
         } else {
-            display_send_data_byte_only(0xff); // black if no data
+            display_send_data_byte_only(0x00); // black if no data
+        }
+    }
+}
+
+void display_show_bitmap_file_at(FILE *file, const uint8_t width, const uint8_t height, const uint8_t x, const uint8_t y, bool invert)
+{
+    display_cmd_t cmd_data_dir = {0x11, false, false, 1, {0x03}}; // x inc, y inc
+    display_send_cmd(&cmd_data_dir);
+    fseek(file, 0, SEEK_SET);
+    for (int j = 0; j < height; j++) {
+        int fpos_img = ftell(file);
+        display_cmd_t cmd_x = {0x4e, false, false, 1, {x/8}}; // reset x to start
+        display_cmd_t cmd_y = {0x4f, false, false, 2, {(y+j)%256, (y+j)/256}}; // set y to current line
+        display_send_cmd(&cmd_x);
+        display_send_cmd(&cmd_y);
+        display_send_cmd_byte_only(0x24);
+        for (int i = 0; i < width/8; i++) {
+            uint8_t data;
+            uint8_t read = fread(&data, 1, 1, file);
+            if (invert) data = ~data;
+            if (read > 0) display_send_data_byte_only(data);
+            else display_send_data_byte_only(0x00); // black if no data
+        }
+        fseek(file, fpos_img, SEEK_SET);
+        display_send_cmd(&cmd_x);
+        display_send_cmd(&cmd_y);
+        display_send_cmd_byte_only(0x26);
+        for (int i = 0; i < width/8; i++) {
+            uint8_t data;
+            uint8_t read = fread(&data, 1, 1, file);
+            if (invert) data = ~data;
+            // data = ~data;
+            if (read > 0) display_send_data_byte_only(data);
+            else display_send_data_byte_only(0x00); // black if no data
+        }
+    }
+}
+
+void display_show_bitmap_file_at_with_mask(FILE *file_img, FILE *file_mask, const uint8_t width, const uint8_t height, const uint8_t x, const uint8_t y, bool invert_image, bool invert_mask)
+{
+    display_cmd_t cmd_data_dir = {0x11, false, false, 1, {0x03}}; // x inc, y inc
+    display_send_cmd(&cmd_data_dir);
+    fseek(file_img, 0, SEEK_SET);
+    fseek(file_mask, 0, SEEK_SET);
+    for (int j = 0; j < height; j++) {
+        int fpos_img = ftell(file_img);
+        int fpos_mask = ftell(file_mask);
+        display_cmd_t cmd_x = {0x4e, false, false, 1, {x/8}}; // reset x to start
+        display_cmd_t cmd_y = {0x4f, false, false, 2, {(y+j)%256, (y+j)/256}}; // set y to current line
+        display_send_cmd(&cmd_x);
+        display_send_cmd(&cmd_y);
+        display_send_cmd_byte_only(0x24);
+        for (int i = 0; i < width/8; i++) {
+            uint8_t data;
+            uint8_t read = fread(&data, 1, 1, file_img);
+            uint8_t mask;
+            fread(&mask, 1, 1, file_mask);
+            if (invert_image) data = ~data;
+            if (invert_mask) mask = ~mask;
+            data = mask | data;
+            if (read > 0) display_send_data_byte_only(data);
+            else display_send_data_byte_only(0x00); // black if no data
+        }
+        fseek(file_img, fpos_img, SEEK_SET);
+        fseek(file_mask, fpos_mask, SEEK_SET);
+        display_send_cmd(&cmd_x);
+        display_send_cmd(&cmd_y);
+        display_send_cmd_byte_only(0x26);
+        for (int i = 0; i < width/8; i++) {
+            uint8_t data;
+            uint8_t read = fread(&data, 1, 1, file_img);
+            uint8_t mask;
+            fread(&mask, 1, 1, file_mask);
+            if (invert_image) data = ~data;
+            if (invert_mask) mask = ~mask;
+            data = mask | data;
+            // data = ~data;
+            if (read > 0) display_send_data_byte_only(data);
+            else display_send_data_byte_only(0x00); // black if no data
         }
     }
 }
@@ -443,4 +551,26 @@ void display_text_center_at(uint8_t y, const char *text)
     uint8_t text_len = strlen(text);
     uint8_t x = (DISPLAY_WIDTH - text_len * font_width) / 2;
     display_text_at(x, y, text);
+}
+
+void display_fill_rect_at(const uint8_t width, const uint8_t height, uint8_t x, uint8_t y)
+{
+    display_cmd_t cmd_data_dir = {0x11, false, false, 1, {0x03}}; // x inc, y inc
+    display_send_cmd(&cmd_data_dir);
+    for (int j = 0; j < height; j++) {
+        display_cmd_t cmd_x = {0x4e, false, false, 1, {x/8}}; // start x
+        display_cmd_t cmd_y = {0x4f, false, false, 2, {(y+j)%256, (y+j)/256}}; // start y
+        display_send_cmd(&cmd_x);
+        display_send_cmd(&cmd_y);
+        display_send_cmd_byte_only(0x24);
+        for (int i = 0; i < width/8; i++) {
+            display_send_data_byte_only(0x00);
+        }
+        display_send_cmd(&cmd_x);
+        display_send_cmd(&cmd_y);
+        display_send_cmd_byte_only(0x26);
+        for (int i = 0; i < width/8; i++) {
+            display_send_data_byte_only(0x00);
+        }
+    }
 }

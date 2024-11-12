@@ -79,9 +79,16 @@ apps_controller_apps_info_t *  apps_controller_list_apps()
     apps_info->apps = malloc(sizeof(apps_controller_app_info_t) * apps_installed.count);
     for (int i = 0; i < apps_installed.count; i++) {
         apps_info->apps[i].name = apps_installed.apps[i].name;
+        apps_info->apps[i].icon = apps_installed.apps[i].icon;
+        apps_info->apps[i].active = (i == apps_installed.active) ? true : false;
     }
     apps_info->count = apps_installed.count;
     return apps_info;
+}
+
+uint8_t apps_controller_get_count()
+{
+    return apps_installed.count;
 }
 
 static void on_touch_long_press(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data)

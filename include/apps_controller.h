@@ -5,6 +5,7 @@
 typedef struct
 {
     const char *name;
+    const char *icon; // app icon filename, 80x80 pixels
     void (*init)();
     void (*deinit)();
 } apps_controller_app_t;
@@ -12,6 +13,8 @@ typedef struct
 typedef struct
 {
     const char *name;
+    const char *icon;
+    bool active;
 } apps_controller_app_info_t;
 
 typedef struct 

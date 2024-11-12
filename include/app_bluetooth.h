@@ -4,4 +4,4 @@
 #include "stdbool.h"
 #include "apps_controller.h"
 
-extern apps_controller_app_t app_menu;
+extern apps_controller_app_t app_bluetooth;

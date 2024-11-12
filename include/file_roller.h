@@ -9,6 +9,7 @@
 #define FL_MAX_FILES 50
 #define FL_MAX_NAME (LFS_NAME_MAX)
 #define BARCODES_PATH "/storage/barcode/"
+#define STORAGE_PATH "/storage/"
 
 typedef struct
 {
