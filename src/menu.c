@@ -12,7 +12,7 @@ static const char * filename_icon_mask = "menu_select_mask";
 static void menu_init();
 static void menu_deinit();
 static void menu_draw_icons();
-static void on_touch_prev_next(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data);
+static void on_touch_event(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data);
 
 apps_controller_app_t app_menu = {
     .name = "menu",
@@ -25,24 +25,25 @@ static int menu_app_selected = 0;
 static int menu_apps_count = 0;
 static const int apps_per_page = 4;
 static int menu_page = 0;
-static int touchpad_num_next = 9;
-static int touchpad_num_prev = 0;
+static int touchpad_num_next = 0;
+static int touchpad_num_prev = 1;
+static int touchpad_num_select = 9;
 static int display_counter = 0;
 
 static void menu_init()
 {
     ESP_LOGI(TAG, "Menu app init");
-    menu_app_selected = 0;
+    menu_app_selected = 1; // skip menu app
     menu_apps_count = 0;
     menu_page = 0;
-    ESP_ERROR_CHECK( esp_event_handler_register_with(touchpad_resolved_event_loop, TOUCH_EVENTS_RESOLVED, TOUCH_EVENT_RESOLVED_PRESS, on_touch_prev_next, NULL) );
+    ESP_ERROR_CHECK( esp_event_handler_register_with(touchpad_resolved_event_loop, TOUCH_EVENTS_RESOLVED, TOUCH_EVENT_RESOLVED_PRESS, on_touch_event, NULL) );
     menu_draw_icons();
 }
 
 static void menu_deinit()
 {
     ESP_LOGI(TAG, "Menu app deinit");
-    ESP_ERROR_CHECK( esp_event_handler_unregister_with(touchpad_resolved_event_loop, TOUCH_EVENTS_RESOLVED, TOUCH_EVENT_RESOLVED_PRESS, on_touch_prev_next) );
+    ESP_ERROR_CHECK( esp_event_handler_unregister_with(touchpad_resolved_event_loop, TOUCH_EVENTS_RESOLVED, TOUCH_EVENT_RESOLVED_PRESS, on_touch_event) );
 }
 
 static void menu_draw_icons()
@@ -72,6 +73,7 @@ static void menu_draw_icons()
         display_update(true);
     }
     for (int i = apps_start; i < apps_start + apps_per_page - 1 || i < menu_apps_count; i++) {
+        if (i == 0) continue; // skip menu app
         char *path_icon = malloc(strlen(STORAGE_PATH) + strlen(apps->apps[i].icon) + 1);
         if (path_icon == NULL) {
             ESP_LOGE(TAG, "Failed to allocate memory");
@@ -113,19 +115,24 @@ static void menu_draw_icons()
     free(apps);
 }
 
-static void on_touch_prev_next(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
+static void on_touch_event(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
 {
     uint8_t touchpad_num = *((uint8_t*)event_data);
     if (touchpad_num == touchpad_num_next) {
         menu_app_selected++;
         if (menu_app_selected >= menu_apps_count) {
-            menu_app_selected = 0;
+            menu_app_selected = 1;
         }
+        menu_draw_icons();
     } else if (touchpad_num == touchpad_num_prev) {
         menu_app_selected--;
         if (menu_app_selected < 0) {
             menu_app_selected = menu_apps_count - 1;
         }
+        menu_draw_icons();
+    } else if (touchpad_num == touchpad_num_select) {
+        apps_controller_apps_info_t *apps = apps_controller_list_apps();
+        apps_controller_activate_app(apps->apps[menu_app_selected].name);
+        free(apps);
     }
-    menu_draw_icons();
 }

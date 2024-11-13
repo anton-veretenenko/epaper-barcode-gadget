@@ -54,7 +54,7 @@ void apps_controller_add_app(apps_controller_app_t *app)
     apps_installed.count++;
 }
 
-void apps_controller_activate_app(char *name)
+void apps_controller_activate_app(const char *name)
 {
     ESP_LOGI(TAG, "Activating app: %s", name);
     for (int i = 0; i < apps_installed.count; i++) {
