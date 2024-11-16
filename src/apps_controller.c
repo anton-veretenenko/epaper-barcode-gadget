@@ -14,16 +14,14 @@ struct {
     int active;
 } apps_installed;
 
-static int touchpad_menu_num_ = 0;
 static void on_touch_long_press(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data);
 
-void apps_controller_init(int touchpad_menu_num)
+void apps_controller_init()
 {
-    ESP_LOGI(TAG, "Initializing apps controller: menu touchpad %d", touchpad_menu_num);
+    ESP_LOGI(TAG, "Initializing apps controller: menu touchpad %d", TOUCHPAD_SELECT);
     apps_installed.apps = NULL;
     apps_installed.count = 0;
     apps_installed.active = -1;
-    touchpad_menu_num_ = touchpad_menu_num;
     ESP_ERROR_CHECK( esp_event_handler_register_with(touchpad_resolved_event_loop, TOUCH_EVENTS_RESOLVED, TOUCH_EVENT_RESOLVED_LONG_PRESS, on_touch_long_press, NULL) );
 }
 
@@ -94,7 +92,7 @@ uint8_t apps_controller_get_count()
 static void on_touch_long_press(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
 {
     uint8_t touchpad_num = *((uint8_t*)event_data);
-    if (event_id == TOUCH_EVENT_RESOLVED_LONG_PRESS && touchpad_num == touchpad_menu_num_) {
+    if (event_id == TOUCH_EVENT_RESOLVED_LONG_PRESS && touchpad_num == TOUCHPAD_SELECT) {
         apps_controller_activate_app("menu");
     }
 }

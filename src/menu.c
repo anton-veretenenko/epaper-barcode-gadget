@@ -25,9 +25,6 @@ static int menu_app_selected = 0;
 static int menu_apps_count = 0;
 static const int apps_per_page = 4;
 static int menu_page = 0;
-static int touchpad_num_next = 0;
-static int touchpad_num_prev = 1;
-static int touchpad_num_select = 9;
 static int display_counter = 0;
 
 static void menu_init()
@@ -36,6 +33,7 @@ static void menu_init()
     menu_app_selected = 1; // skip menu app
     menu_apps_count = 0;
     menu_page = 0;
+    display_counter = 0;
     ESP_ERROR_CHECK( esp_event_handler_register_with(touchpad_resolved_event_loop, TOUCH_EVENTS_RESOLVED, TOUCH_EVENT_RESOLVED_PRESS, on_touch_event, NULL) );
     menu_draw_icons();
 }
@@ -118,19 +116,19 @@ static void menu_draw_icons()
 static void on_touch_event(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
 {
     uint8_t touchpad_num = *((uint8_t*)event_data);
-    if (touchpad_num == touchpad_num_next) {
+    if (touchpad_num == TOUCHPAD_RIGHT) {
         menu_app_selected++;
         if (menu_app_selected >= menu_apps_count) {
             menu_app_selected = 1;
         }
         menu_draw_icons();
-    } else if (touchpad_num == touchpad_num_prev) {
+    } else if (touchpad_num == TOUCHPAD_LEFT) {
         menu_app_selected--;
         if (menu_app_selected < 0) {
             menu_app_selected = menu_apps_count - 1;
         }
         menu_draw_icons();
-    } else if (touchpad_num == touchpad_num_select) {
+    } else if (touchpad_num == TOUCHPAD_SELECT) {
         apps_controller_apps_info_t *apps = apps_controller_list_apps();
         apps_controller_activate_app(apps->apps[menu_app_selected].name);
         free(apps);

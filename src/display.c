@@ -355,21 +355,21 @@ void display_show_bitmap_file(FILE *file, const uint8_t width, const uint8_t hei
     display_send_cmd(&cmd_data_dir);
     display_send_cmd_byte_only(0x24);
     fseek(file, 0, SEEK_SET);
-    // uint8_t *filebuf = (uint8_t *)malloc(width*height/8);
-    // for (int i = width*height/8; i > 0; i--) {
-    //     uint8_t data;
-    //     uint8_t read = fread(&data, 1, 1, file);
-    //     if (read > 0) {
-    //         // display_send_data_byte_only(data);
-    //         filebuf[i-1] = data;
-    //     } else {
-    //         // display_send_data_byte_only(0xff); // black if no data
-    //         filebuf[i-1] = 0xff;
-    //     }
-    // }
-    // for (int i = 0; i < width*height/8; i++) {
-    //     display_send_data_byte_only(filebuf[i]);
-    // }
+    for (int i = 0; i < width*height/8; i++) {
+        uint8_t data;
+        uint8_t read = fread(&data, 1, 1, file);
+        if (read > 0) {
+            display_send_data_byte_only(data);
+        } else {
+            display_send_data_byte_only(0x00); // black if no data
+        }
+    }
+    fseek(file, 0, SEEK_SET);
+    // reset pos to 0,0
+    for (int i = 0; i < sizeof(display_init_cmds) / sizeof(display_cmd_t); i++) {
+        display_send_cmd(&display_init_cmds[i]);
+    }
+    display_send_cmd_byte_only(0x26);
     for (int i = 0; i < width*height/8; i++) {
         uint8_t data;
         uint8_t read = fread(&data, 1, 1, file);
@@ -506,6 +506,12 @@ void display_text_at(uint8_t x, uint8_t y, const char *text)
         display_send_cmd_byte_only(0x24);
         uint16_t font_index = (c - font_start) * font_height + 4;
         // ESP_LOGI(TAG, "Char: %c, index: %d", c, font_index);
+        for (int line = 0; line < font_height; line++) {
+            display_send_data_byte_only(~font_Sinclair_S[font_index + line]);
+        }
+        display_send_cmd(&cmd_x);
+        display_send_cmd(&cmd_y);
+        display_send_cmd_byte_only(0x26);
         for (int line = 0; line < font_height; line++) {
             display_send_data_byte_only(~font_Sinclair_S[font_index + line]);
         }

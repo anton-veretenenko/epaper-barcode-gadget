@@ -1,11 +1,11 @@
 #include "touchpad.h"
-#include "driver/touch_pad.h"
 #include "esp_timer.h"
 #include "esp_event.h"
 #include "stdio.h"
 #include "string.h"
 #include "esp_log.h"
 #include "driver/gpio.h"
+#include "sleep.h"
 
 static const char *TAG = "TOUCHPAD";
 RTC_DATA_ATTR long last_touch = 0;
@@ -38,7 +38,7 @@ void touchpad_init(uint16_t touchpad_mask)
     };
     ESP_ERROR_CHECK( esp_event_loop_create(&loop_args, &touchpad_event_loop) );
     esp_event_loop_args_t loop_args_resolved = {
-        .queue_size = 5,
+        .queue_size = 1,
         .task_name = "touch_resolved_event_loop_task",
         .task_priority = uxTaskPriorityGet(NULL),
         .task_stack_size = configMINIMAL_STACK_SIZE*2,
@@ -67,7 +67,7 @@ void touchpad_init(uint16_t touchpad_mask)
             uint16_t touch_value;
             touch_pad_read_filtered(i, &touch_value);
             ESP_LOGI(TAG, "touch pad %d no touch value: %d\n", i, touch_value);
-            touch_pad_set_thresh(i, touch_value * 3 / 4);
+            touch_pad_set_thresh(i, touch_value * 2.5f / 4);
         }
     }
     touch_pad_set_trigger_mode(TOUCH_TRIGGER_BELOW);
@@ -99,7 +99,7 @@ static void touchpad_isr(void* arg)
         for (int i = 0; i < TOUCH_PAD_MAX; i++) {
             if (pad_intr & (1 << i)) {
                 touch_pad_timestamps[i] = esp_timer_get_time();
-                ESP_ERROR_CHECK( esp_event_post_to(touchpad_event_loop, TOUCH_EVENTS, TOUCH_EVENT_PRESS, &(touch_pad_nums[i]), sizeof(touch_pad_nums[i]), 0) );
+                esp_event_post_to(touchpad_event_loop, TOUCH_EVENTS, TOUCH_EVENT_PRESS, &(touch_pad_nums[i]), sizeof(touch_pad_nums[i]), 0);
                 // revert interrupt to detect touch release
                 touch_pad_set_trigger_mode(TOUCH_TRIGGER_ABOVE);
                 break;
@@ -113,7 +113,7 @@ static void touchpad_isr(void* arg)
             if (pad_intr & (1 << i)) {
                 if (touch_pad_timestamps[i] != 0) {
                     touch_pad_timestamps[i] = 0; // reset timestamp to trigger long press wait loop to end in event handler
-                    ESP_ERROR_CHECK( esp_event_post_to(touchpad_event_loop, TOUCH_EVENTS, TOUCH_EVENT_RELEASE, &(touch_pad_nums[i]), sizeof(touch_pad_nums[i]), 0) );
+                    esp_event_post_to(touchpad_event_loop, TOUCH_EVENTS, TOUCH_EVENT_RELEASE, &(touch_pad_nums[i]), sizeof(touch_pad_nums[i]), 0);
                     // revert interrupt to detect touch press
                     touch_pad_set_trigger_mode(TOUCH_TRIGGER_BELOW);
                     break;
@@ -127,6 +127,7 @@ static void touchpad_isr(void* arg)
 static void on_touchpad_event(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
 {
     ESP_LOGD(TAG, "Touch event, base=%s, id=%ld", event_base, event_id);
+    sleep_register_activity();
     uint8_t touchpad_num = *((uint8_t*)event_data);
     if (event_id == TOUCH_EVENT_PRESS) {
         ESP_LOGD(TAG, "TOUCH_EVENT_PRESS data=%d ts=%d", touchpad_num, touch_pad_timestamps[touchpad_num]);
@@ -140,17 +141,17 @@ static void on_touchpad_event(void* arg, esp_event_base_t event_base, int32_t ev
         }
         if (duration > 600 && touch_pad_timestamps[touchpad_num] != 0) {
             ESP_LOGD(TAG, "TOUCH_EVENT_PRESS LONG data=%d ts=%d", touchpad_num, touch_pad_timestamps[touchpad_num]);
-            ESP_ERROR_CHECK( esp_event_post_to(touchpad_event_loop, TOUCH_EVENTS, TOUCH_EVENT_RELEASE, &(touch_pad_nums[touchpad_num]), sizeof(touch_pad_nums[touchpad_num]), 0) );
+            esp_event_post_to(touchpad_event_loop, TOUCH_EVENTS, TOUCH_EVENT_RELEASE, &(touch_pad_nums[touchpad_num]), sizeof(touch_pad_nums[touchpad_num]), 0);
         }
     } else if (event_id == TOUCH_EVENT_RELEASE) {
         if (touch_pad_timestamps[touchpad_num] != 0) {
             ESP_LOGD(TAG, "TOUCH_EVENT_RELEASE LONG data=%d", touchpad_num);
             touch_pad_pressed[touchpad_num] = false;
-            ESP_ERROR_CHECK( esp_event_post_to(touchpad_resolved_event_loop, TOUCH_EVENTS_RESOLVED, TOUCH_EVENT_RESOLVED_LONG_PRESS, &(touch_pad_nums[touchpad_num]), sizeof(touch_pad_nums[touchpad_num]), 0) );
+            esp_event_post_to(touchpad_resolved_event_loop, TOUCH_EVENTS_RESOLVED, TOUCH_EVENT_RESOLVED_LONG_PRESS, &(touch_pad_nums[touchpad_num]), sizeof(touch_pad_nums[touchpad_num]), 0);
         } else {
             ESP_LOGD(TAG, "TOUCH_EVENT_RELEASE data=%d", touchpad_num);
             if (touch_pad_pressed[touchpad_num] == true) {
-                ESP_ERROR_CHECK( esp_event_post_to(touchpad_resolved_event_loop, TOUCH_EVENTS_RESOLVED, TOUCH_EVENT_RESOLVED_PRESS, &(touch_pad_nums[touchpad_num]), sizeof(touch_pad_nums[touchpad_num]), 0) );
+                esp_event_post_to(touchpad_resolved_event_loop, TOUCH_EVENTS_RESOLVED, TOUCH_EVENT_RESOLVED_PRESS, &(touch_pad_nums[touchpad_num]), sizeof(touch_pad_nums[touchpad_num]), 0);
                 touch_pad_pressed[touchpad_num] = false;
             }
         }

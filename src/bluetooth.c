@@ -30,6 +30,7 @@ enum {
 static const char *device_name = "eBarcoder";
 esp_err_t ret;
 static const char *tag = "NimBLE_BLE";
+static uint8_t mac_address[6] = {0};
 static uint8_t own_addr_type;
 static uint16_t conn_handle;
 static uint16_t char_value_handle_filename;
@@ -239,7 +240,6 @@ static int char_access_data(uint16_t conn_handle, uint16_t attr_handle,
 
 void bluetooth_start() //! Call this function to start BLE
 {
-
     //! Below is the sequence of APIs to be called to init/enable NimBLE host and ESP controller:
     printf("\n Staring BLE \n");
     int rc;
@@ -564,14 +564,18 @@ bleprph_on_sync(void)
     }
 
     /* Printing ADDR */
-    uint8_t addr_val[6] = {0};
-    rc = ble_hs_id_copy_addr(own_addr_type, addr_val, NULL);
+    rc = ble_hs_id_copy_addr(own_addr_type, mac_address, NULL);
 
     MODLOG_DFLT(INFO, "Device Address: ");
-    print_addr(addr_val);
+    print_addr(mac_address);
     MODLOG_DFLT(INFO, "\n");
     /* Begin advertising. */
     bleprph_advertise();
+}
+
+void bluetooth_get_mac(uint8_t mac[6])
+{
+    memcpy(mac, mac_address, 6);
 }
 
 void bleprph_host_task(void *param)
