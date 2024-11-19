@@ -6,6 +6,7 @@
 #include "esp_log.h"
 #include "driver/gpio.h"
 #include "sleep.h"
+#include "nvs_flash.h"
 
 static const char *TAG = "TOUCHPAD";
 RTC_DATA_ATTR long last_touch = 0;
@@ -20,12 +21,13 @@ ESP_EVENT_DEFINE_BASE(TOUCH_EVENTS);
 ESP_EVENT_DEFINE_BASE(TOUCH_EVENTS_RESOLVED);
 esp_event_loop_handle_t touchpad_event_loop;
 esp_event_loop_handle_t touchpad_resolved_event_loop;
+static nvs_handle_t nvs_touch_handle;
 
 static void touchpad_isr(void* arg);
 static void on_touchpad_event(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data);
 static void on_touchpad_resolved_event(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data);
 
-void touchpad_init(uint16_t touchpad_mask)
+void touchpad_init(uint16_t touchpad_mask, bool sleep_wakeup)
 {
     ESP_ERROR_CHECK( touch_pad_init() );
 
@@ -52,7 +54,7 @@ void touchpad_init(uint16_t touchpad_mask)
 
     touch_pad_set_fsm_mode(TOUCH_FSM_MODE_TIMER);
     touch_pad_set_voltage(TOUCH_HVOLT_2V7, TOUCH_LVOLT_0V5, TOUCH_HVOLT_ATTEN_1V);
-    ESP_LOGI(TAG, "Touch pad mask: %02X\n", touchpad_mask);
+    ESP_LOGI(TAG, "Touch pad mask: %02X", touchpad_mask);
     // enable touch pads
     for (int i = 0; i < TOUCH_PAD_MAX; i++) {
         if (touchpad_mask & (1 << i)) {
@@ -60,17 +62,43 @@ void touchpad_init(uint16_t touchpad_mask)
         }
     }
     // then read no touch values and init new thesholds
+    // force touch pads calibration if nvs open failed
+    esp_err_t err;
+    err = nvs_open("touch", NVS_READWRITE, &nvs_touch_handle);
+    if (ESP_OK != err) {
+        ESP_LOGE(TAG, "Failed to open NVS handle to save/load touch thresholds");
+        sleep_wakeup = false;
+    }
     for (int i = 0; i < TOUCH_PAD_MAX; i++) {
         if (touchpad_mask & (1 << i)) {
             touch_pad_filter_start(200);
             // init threshold
             uint16_t touch_value = 0;
-            while (touch_value == 0) touch_pad_read_filtered(i, &touch_value);
-            ESP_LOGI(TAG, "touch pad %d no touch value: %d\n", i, touch_value);
-            // touch_pad_set_thresh(i, touch_value * 2.5f / 4);
-            touch_pad_set_thresh(i, touch_value - 75);
+            uint16_t touch_threshold = 0;
+            char key[sizeof("pad-0")] = {0x00};
+            strcat(key, "pad-");
+            uint8_t len = strlen(key);
+            key[len] = i + '0';
+            key[len+1] = 0x00;
+            if (!sleep_wakeup) {
+                while (touch_value == 0) touch_pad_read_filtered(i, &touch_value);
+                ESP_LOGI(TAG, "touch pad %d no touch value: %d", i, touch_value);
+                // touch_pad_set_thresh(i, touch_value * 2.5f / 4);
+                touch_threshold = touch_value - 75;
+                if (ESP_OK != nvs_set_u16(nvs_touch_handle, key, touch_threshold))
+                    ESP_LOGE(TAG, "Failed to save touch threshold: %s", key);
+            } else {
+                // get threshold from nvs
+                err = nvs_get_u16(nvs_touch_handle, key, &touch_threshold);
+                if (ESP_OK != err)
+                    ESP_LOGE(TAG, "Failed to read touch threshold: %s err %d", key, err);
+            }
+            touch_pad_set_thresh(i, touch_threshold);
         }
     }
+    // save thresholds to nvs
+    if (!sleep_wakeup && ESP_OK != nvs_commit(nvs_touch_handle))
+        ESP_LOGE(TAG, "Failed to commit touch thresholds");
     touch_pad_set_trigger_mode(TOUCH_TRIGGER_BELOW);
     touch_pad_isr_register(touchpad_isr, NULL);
     touch_pad_intr_enable();

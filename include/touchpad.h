@@ -5,7 +5,7 @@
 #include "esp_event.h"
 #include "driver/touch_pad.h"
 
-void touchpad_init(uint16_t touchpad_mask);
+void touchpad_init(uint16_t touchpad_mask, bool sleep_wakeup);
 void touchpad_sleep_wakeup_init();
 
 extern esp_event_loop_handle_t touchpad_event_loop;

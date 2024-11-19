@@ -94,7 +94,7 @@ static void main_task(void *)
 
     while (true) {
         vTaskDelay(100 / portTICK_PERIOD_MS);
-        uint16_t touch_value;
+        // uint16_t touch_value;
         // touch_pad_read_filtered(TOUCHPAD_SELECT, &touch_value);
         // ESP_LOGI(TAG, "SELECT touch value: %d", touch_value);
         // touch_pad_read_filtered(TOUCHPAD_LEFT, &touch_value);
@@ -110,31 +110,37 @@ void app_main() {
     // get wakeup reason
     esp_sleep_wakeup_cause_t wakeup_reason = esp_sleep_get_wakeup_cause();
     int wakeup_pin = esp_sleep_get_touchpad_wakeup_status();
+    uint16_t touchpads_mask = 0 | (1 << TOUCHPAD_LEFT) | (1 << TOUCHPAD_RIGHT) | (1 << TOUCHPAD_SELECT);
 
+    ESP_LOGW(TAG, "INIT, Free heap: %lu", esp_get_free_heap_size());
     power_init();
     nvs_init();
     gpio_init();
     fs_init();
-    printf("INIT\n");
     display_init();
     fl_init(BARCODES_PATH);
     sleep_init(30, on_sleep_event);
-    vTaskDelay(3000 / portTICK_PERIOD_MS);
-    touchpad_init(0 | (1 << TOUCHPAD_LEFT) | (1 << TOUCHPAD_RIGHT) | (1 << TOUCHPAD_SELECT));
+
+    if (wakeup_reason == ESP_SLEEP_WAKEUP_TOUCHPAD) {
+        ESP_LOGI(TAG, "Woken by Touch: %d", wakeup_pin);
+        touchpad_init(touchpads_mask, true);
+    } else {
+        // add delay to let touch pads charge settle?
+        // otherwise touch pads raw values are too low
+        vTaskDelay(3000 / portTICK_PERIOD_MS);
+        touchpad_init(touchpads_mask, false);
+    }
+
     apps_controller_init();
     apps_controller_add_app(&app_menu);
     apps_controller_add_app(&app_barcode);
     apps_controller_add_app(&app_bluetooth);
-
     if (wakeup_reason == ESP_SLEEP_WAKEUP_TOUCHPAD) {
-        ESP_LOGI(TAG, "Woken by Touch: %d", wakeup_pin);
         if (wakeup_pin == TOUCHPAD_SELECT || wakeup_pin == TOUCHPAD_LEFT || wakeup_pin == TOUCHPAD_RIGHT) {
             sleep_register_activity();
             apps_controller_activate_app("barcode");
         }
     } else {
-        // add delay to let open terminal after flashing
-        vTaskDelay(4000 / portTICK_PERIOD_MS);
         apps_controller_activate_app("menu");
     }
 
