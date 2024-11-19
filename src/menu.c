@@ -124,7 +124,7 @@ static void on_touch_event(void* arg, esp_event_base_t event_base, int32_t event
         menu_draw_icons();
     } else if (touchpad_num == TOUCHPAD_LEFT) {
         menu_app_selected--;
-        if (menu_app_selected < 0) {
+        if (menu_app_selected < 1) {
             menu_app_selected = menu_apps_count - 1;
         }
         menu_draw_icons();

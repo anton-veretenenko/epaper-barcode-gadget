@@ -94,6 +94,13 @@ static void main_task(void *)
 
     while (true) {
         vTaskDelay(100 / portTICK_PERIOD_MS);
+        uint16_t touch_value;
+        // touch_pad_read_filtered(TOUCHPAD_SELECT, &touch_value);
+        // ESP_LOGI(TAG, "SELECT touch value: %d", touch_value);
+        // touch_pad_read_filtered(TOUCHPAD_LEFT, &touch_value);
+        // ESP_LOGI(TAG, "LEFT touch value: %d", touch_value);
+        // touch_pad_read_filtered(TOUCHPAD_RIGHT, &touch_value);
+        // ESP_LOGI(TAG, "RIGHT touch value: %d", touch_value);
     }
 }
 
@@ -109,18 +116,19 @@ void app_main() {
     gpio_init();
     fs_init();
     printf("INIT\n");
-    touchpad_init(0 | (1 << TOUCH_PAD_NUM0) | (1 << TOUCH_PAD_NUM9));
     display_init();
     fl_init(BARCODES_PATH);
+    sleep_init(30, on_sleep_event);
+    vTaskDelay(3000 / portTICK_PERIOD_MS);
+    touchpad_init(0 | (1 << TOUCHPAD_LEFT) | (1 << TOUCHPAD_RIGHT) | (1 << TOUCHPAD_SELECT));
     apps_controller_init();
     apps_controller_add_app(&app_menu);
     apps_controller_add_app(&app_barcode);
     apps_controller_add_app(&app_bluetooth);
-    sleep_init(30, on_sleep_event);
-    
+
     if (wakeup_reason == ESP_SLEEP_WAKEUP_TOUCHPAD) {
         ESP_LOGI(TAG, "Woken by Touch: %d", wakeup_pin);
-        if (wakeup_pin == TOUCH_PAD_NUM0) {
+        if (wakeup_pin == TOUCHPAD_SELECT || wakeup_pin == TOUCHPAD_LEFT || wakeup_pin == TOUCHPAD_RIGHT) {
             sleep_register_activity();
             apps_controller_activate_app("barcode");
         }

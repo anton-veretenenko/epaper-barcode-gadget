@@ -60,14 +60,15 @@ void touchpad_init(uint16_t touchpad_mask)
         }
     }
     // then read no touch values and init new thesholds
-    touch_pad_filter_start(20);
     for (int i = 0; i < TOUCH_PAD_MAX; i++) {
         if (touchpad_mask & (1 << i)) {
+            touch_pad_filter_start(200);
             // init threshold
-            uint16_t touch_value;
-            touch_pad_read_filtered(i, &touch_value);
+            uint16_t touch_value = 0;
+            while (touch_value == 0) touch_pad_read_filtered(i, &touch_value);
             ESP_LOGI(TAG, "touch pad %d no touch value: %d\n", i, touch_value);
-            touch_pad_set_thresh(i, touch_value * 2.5f / 4);
+            // touch_pad_set_thresh(i, touch_value * 2.5f / 4);
+            touch_pad_set_thresh(i, touch_value - 75);
         }
     }
     touch_pad_set_trigger_mode(TOUCH_TRIGGER_BELOW);
