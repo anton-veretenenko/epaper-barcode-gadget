@@ -25,6 +25,7 @@
 #include "app_bluetooth.h"
 #include "app_barcode.h"
 #include "sleep.h"
+#include "battery.h"
 
 #define GPIO_LED 22
 static void gpio_init();
@@ -120,6 +121,8 @@ void app_main() {
     display_init();
     fl_init(BARCODES_PATH);
     sleep_init(30, on_sleep_event);
+    battery_init();
+    battery_get_charge();
 
     if (wakeup_reason == ESP_SLEEP_WAKEUP_TOUCHPAD) {
         ESP_LOGI(TAG, "Woken by Touch: %d", wakeup_pin);
