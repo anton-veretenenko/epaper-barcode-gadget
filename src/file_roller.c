@@ -25,7 +25,6 @@ void fl_init(char *path)
     fl_files.current = 0;
     if ((dir = opendir(path)) != NULL) {
         while ((ent = readdir(dir)) != NULL) {
-            ent->d_type == DT_DIR ? printf("D ") : printf("F ");
             if (ent->d_type != DT_DIR) {
                 char *name = malloc(strlen(ent->d_name) + 1);
                 memcpy(name, ent->d_name, strlen(ent->d_name) + 1);
@@ -35,7 +34,7 @@ void fl_init(char *path)
                 }
                 fl_files.count++;
             }
-            ESP_LOGI(TAG, "%s", ent->d_name);
+            ESP_LOGI(TAG, "%s %s", ent->d_type == DT_DIR ? "D" : "F", ent->d_name);
         }
         closedir(dir);
     } else {
