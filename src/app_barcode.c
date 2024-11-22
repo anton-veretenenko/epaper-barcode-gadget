@@ -5,6 +5,7 @@
 #include "file_roller.h"
 #include "touchpad.h"
 #include "esp_event.h"
+#include "battery.h"
 
 static const char * TAG = "app_barcode";
 static void app_barcode_init();
@@ -79,8 +80,10 @@ static void draw_barcode()
                 display_text_at(200-strlen(str_display)*8, 200-16, str_display);
                 memset(str_display, 0, 5+1);
                 strcat(str_display, " ");
-                strcat(str_display, "99%");
-                strcat(str_display, "\x7F");
+                uint8_t charge = battery_get_charge();
+                sprintf(str_display, " %02d%%\x7F", charge);
+                // strcat(str_display, "99%");
+                // strcat(str_display, "\x7F");
                 display_text_at(200-strlen(str_display)*8, 200-8, str_display);
                 free(str_display);
             } else {
