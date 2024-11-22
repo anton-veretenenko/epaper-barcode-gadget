@@ -5,7 +5,7 @@
 #include "esp_log.h"
 
 static const char *TAG = "battery";
-#define BATTERY_ADC_CHANNEL ADC1_CHANNEL_0
+#define BATTERY_ADC_CHANNEL ADC1_CHANNEL_6
 #define BATTERY_ADC_SAMPLES 64
 static esp_adc_cal_characteristics_t adc_chars;
 
