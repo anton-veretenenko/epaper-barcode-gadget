@@ -9,6 +9,7 @@
 
 static const char * TAG = "app_menu";
 static const char * filename_icon_mask = "menu_select_mask";
+static const char * filename_icon_mask_96 = "menu_select_mask_96";
 static void menu_init();
 static void menu_deinit();
 static void menu_draw_icons();
@@ -62,6 +63,22 @@ static void menu_draw_icons()
         free(apps);
         return;
     }
+    free(path_mask);
+    path_mask = malloc(strlen(STORAGE_PATH) + strlen(filename_icon_mask_96) + 1);
+    if (path_mask == NULL) {
+        ESP_LOGE(TAG, "Failed to allocate memory");
+        return;
+    }
+    strcpy(path_mask, STORAGE_PATH);
+    strcat(path_mask, filename_icon_mask_96);
+    FILE *icon_mask_96 = fopen(path_mask, "rb");
+    if (icon_mask_96 == NULL) {
+        ESP_LOGE(TAG, "Failed to open mask file: %s", path_mask);
+        free(path_mask);
+        free(apps);
+        return;
+    }
+    free(path_mask);
     uint8_t apps_start = menu_page * apps_per_page;
     uint8_t row = 0;
     uint8_t col = 0;
@@ -86,8 +103,11 @@ static void menu_draw_icons()
             break;
         }
         if (menu_app_selected == i) {
-            display_show_bitmap_file_at_with_mask(icon, icon_mask, 80, 80, (col*80)+8+(col*24), (row*80)+8+(row*24), true, false);
-            display_fill_rect_at(32, 4, (col*80)+32+(col*24), (row*80)+8+(row*24)+80+4);
+            display_show_bitmap_file_at(icon_mask_96, 96, 96, (col*80)+(col*24), (row*80)+(row*24), false);
+            // display_show_bitmap_file_at(icon_mask_96, 96, 96, 0, 0, false);
+            // display_show_bitmap_file_at_with_mask(icon, icon_mask, 80, 80, (col*80)+8+(col*24), (row*80)+8+(row*24), true, false);
+            display_show_bitmap_file_at(icon, 80, 80, (col*80)+8+(col*24), (row*80)+8+(row*24), true);
+            // display_fill_rect_at(32, 4, (col*80)+32+(col*24), (row*80)+8+(row*24)+80+4);
             // display_fill_rect_at(100, 100, 0, 0);
         } else {
             display_show_bitmap_file_at(icon, 80, 80, (col*80)+8+(col*24), (row*80)+8+(row*24), false);
@@ -101,14 +121,14 @@ static void menu_draw_icons()
     }
     if (display_counter == 0)
         // display_finish_partial();
-        display_finish(false);
+        display_finish(true);
     else
         display_finish(true);
         // display_finish_partial();
     if (++display_counter > 5) display_counter = 0;
     
     fclose(icon_mask);
-    free(path_mask);
+    fclose(icon_mask_96);
     
     free(apps);
 }
