@@ -113,6 +113,7 @@ void app_main() {
     int wakeup_pin = esp_sleep_get_touchpad_wakeup_status();
     uint16_t touchpads_mask = 0 | (1 << TOUCHPAD_LEFT) | (1 << TOUCHPAD_RIGHT) | (1 << TOUCHPAD_SELECT);
 
+    // vTaskDelay(4000 / portTICK_PERIOD_MS);
     ESP_LOGW(TAG, "INIT, Free heap: %lu", esp_get_free_heap_size());
     power_init();
     nvs_init();
@@ -130,7 +131,7 @@ void app_main() {
     } else {
         // add delay to let touch pads charge settle?
         // otherwise touch pads raw values are too low
-        vTaskDelay(3000 / portTICK_PERIOD_MS);
+        vTaskDelay(4000 / portTICK_PERIOD_MS);
         touchpad_init(touchpads_mask, false);
     }
 
