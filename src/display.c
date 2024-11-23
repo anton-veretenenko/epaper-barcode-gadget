@@ -125,7 +125,7 @@ static void display_reset_hw()
 static void display_wait_busy()
 {
     while (gpio_get_level(DISPLAY_PIN_BUSY) == 1) {
-        vTaskDelay(1 / portTICK_PERIOD_MS);
+        vTaskDelay(10 / portTICK_PERIOD_MS);
     }
 }
 
