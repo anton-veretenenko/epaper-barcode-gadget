@@ -22,6 +22,7 @@ ESP_EVENT_DEFINE_BASE(TOUCH_EVENTS_RESOLVED);
 esp_event_loop_handle_t touchpad_event_loop;
 esp_event_loop_handle_t touchpad_resolved_event_loop;
 static nvs_handle_t nvs_touch_handle;
+static uint16_t touchpad_mask_set = 0;
 
 static void touchpad_isr(void* arg);
 static void on_touchpad_event(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data);
@@ -32,7 +33,7 @@ void touchpad_init(uint16_t touchpad_mask, bool sleep_wakeup)
     ESP_ERROR_CHECK( touch_pad_init() );
 
     esp_event_loop_args_t loop_args = {
-        .queue_size = 5,
+        .queue_size = 1,
         .task_name = "touch_event_loop_task",
         .task_priority = uxTaskPriorityGet(NULL),
         .task_stack_size = configMINIMAL_STACK_SIZE*2,
@@ -58,6 +59,14 @@ void touchpad_init(uint16_t touchpad_mask, bool sleep_wakeup)
     // enable touch pads
     for (int i = 0; i < TOUCH_PAD_MAX; i++) {
         if (touchpad_mask & (1 << i)) {
+            ESP_LOGI(TAG, "Enabling touch pad %d", i);
+            // gpio_config_t io_conf;
+            // io_conf.intr_type = GPIO_INTR_DISABLE;
+            // io_conf.mode = GPIO_MODE_OUTPUT;
+            // io_conf.pin_bit_mask = 1ULL << GPIO_LED;
+            // io_conf.pull_down_en = 0;
+            // io_conf.pull_up_en = 0;
+            // gpio_config(&io_conf);
             touch_pad_config(i, 0);
         }
     }
@@ -69,9 +78,11 @@ void touchpad_init(uint16_t touchpad_mask, bool sleep_wakeup)
         ESP_LOGE(TAG, "Failed to open NVS handle to save/load touch thresholds");
         sleep_wakeup = false;
     }
+    touch_pad_filter_start(30);
+    if (!sleep_wakeup)
+        vTaskDelay(2000 / portTICK_PERIOD_MS);
     for (int i = 0; i < TOUCH_PAD_MAX; i++) {
         if (touchpad_mask & (1 << i)) {
-            touch_pad_filter_start(200);
             // init threshold
             uint16_t touch_value = 0;
             uint16_t touch_threshold = 0;
@@ -84,7 +95,7 @@ void touchpad_init(uint16_t touchpad_mask, bool sleep_wakeup)
                 while (touch_value == 0) touch_pad_read_filtered(i, &touch_value);
                 ESP_LOGI(TAG, "touch pad %d no touch value: %d", i, touch_value);
                 // touch_pad_set_thresh(i, touch_value * 2.5f / 4);
-                touch_threshold = touch_value - 75;
+                touch_threshold = touch_value - 40;
                 if (ESP_OK != nvs_set_u16(nvs_touch_handle, key, touch_threshold))
                     ESP_LOGE(TAG, "Failed to save touch threshold: %s", key);
             } else {
@@ -116,8 +127,14 @@ static void touchpad_isr(void* arg)
 {
     uint32_t pad_intr = touch_pad_get_status();
     touch_pad_clear_status();
-    touch_pad_intr_clear();
+    // touch_pad_intr_clear();
     touch_pad_intr_disable();
+    if (pad_intr == 0) {
+        touch_pad_intr_enable();
+        return;
+    }
+    pad_intr &= ~touchpad_mask_set; // filter only enabled touch pads
+
     touch_trigger_mode_t mode;
     touch_pad_get_trigger_mode(&mode);
 
@@ -158,6 +175,7 @@ static void on_touchpad_event(void* arg, esp_event_base_t event_base, int32_t ev
     ESP_LOGD(TAG, "Touch event, base=%s, id=%ld", event_base, event_id);
     sleep_register_activity();
     uint8_t touchpad_num = *((uint8_t*)event_data);
+    if (touchpad_num == 0) return;
     if (event_id == TOUCH_EVENT_PRESS) {
         ESP_LOGD(TAG, "TOUCH_EVENT_PRESS data=%d ts=%d", touchpad_num, touch_pad_timestamps[touchpad_num]);
         touch_pad_pressed[touchpad_num] = true;
@@ -173,7 +191,7 @@ static void on_touchpad_event(void* arg, esp_event_base_t event_base, int32_t ev
             esp_event_post_to(touchpad_event_loop, TOUCH_EVENTS, TOUCH_EVENT_RELEASE, &(touch_pad_nums[touchpad_num]), sizeof(touch_pad_nums[touchpad_num]), 0);
         }
     } else if (event_id == TOUCH_EVENT_RELEASE) {
-        if (touch_pad_timestamps[touchpad_num] != 0) {
+        if (touch_pad_timestamps[touchpad_num] != 0) { // if already released by duration
             ESP_LOGD(TAG, "TOUCH_EVENT_RELEASE LONG data=%d", touchpad_num);
             touch_pad_pressed[touchpad_num] = false;
             esp_event_post_to(touchpad_resolved_event_loop, TOUCH_EVENTS_RESOLVED, TOUCH_EVENT_RESOLVED_LONG_PRESS, &(touch_pad_nums[touchpad_num]), sizeof(touch_pad_nums[touchpad_num]), 0);
@@ -190,6 +208,7 @@ static void on_touchpad_event(void* arg, esp_event_base_t event_base, int32_t ev
 static void on_touchpad_resolved_event(void* arg, esp_event_base_t event_base, int32_t event_id, void* event_data)
 {
     uint8_t touchpad_num = *((uint8_t*)event_data);
+    if (touchpad_num == 0) return;
     switch (event_id) {
         case TOUCH_EVENT_RESOLVED_PRESS: {
             ESP_LOGI(TAG, "TOUCH_EVENT_RESOLVED_PRESS: %d", touchpad_num);
