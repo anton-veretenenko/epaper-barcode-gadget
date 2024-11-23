@@ -21,6 +21,7 @@ apps_controller_app_t app_barcode = {
 };
 
 RTC_DATA_ATTR static fl_file_t barcode_file;
+static bool drawing = false;
 
 static void app_barcode_init()
 {
@@ -48,54 +49,60 @@ static void on_touch_event(void* arg, esp_event_base_t event_base, int32_t event
         draw_barcode();
     } else if (touchpad_num == TOUCHPAD_SELECT) {
         // do something with select button
-        draw_barcode();
+        // draw_barcode();
     }
 }
 
 static void draw_barcode()
 {
-        size_t total_bytes, used_bytes;
-        esp_littlefs_info("storage", &total_bytes, &used_bytes);
-        ESP_LOGI(TAG, "Total bytes: %d, Used bytes: %d", total_bytes, used_bytes);
-        uint16_t used_percent = (uint16_t)((float)used_bytes / total_bytes * 100);
-        if (used_percent > 99) used_percent = 99;
-        display_start(true);
-        if (barcode_file.name != NULL) {
-            ESP_LOGI(TAG, "Will draw file: %s", barcode_file.name);
-            char *path = malloc(strlen(BARCODES_PATH) + strlen(barcode_file.name) + 1);
-            strcpy(path, BARCODES_PATH);
-            strcat(path, barcode_file.name);
-            FILE *img_file = fopen(path, "rb");
-            if (img_file) {
-                display_show_bitmap_file(img_file, 200, 200);
-                fclose(img_file);
-                char *str_display = malloc(strlen(barcode_file.name) + 1 + 2);
-                strcpy(str_display, " ");
-                strcat(str_display, barcode_file.name);
-                strcat(str_display, " ");
-                display_text_center_at(5, str_display);
-                memset(str_display, 0, 5+1);
-                sprintf(str_display, " %d%%", 100-used_percent);
-                strcat(str_display, "\x80");
-                display_text_at(200-strlen(str_display)*8, 200-16, str_display);
-                memset(str_display, 0, 5+1);
-                strcat(str_display, " ");
-                uint8_t charge = battery_get_charge();
-                sprintf(str_display, " %02d%%\x7F", charge);
-                // strcat(str_display, "99%");
-                // strcat(str_display, "\x7F");
-                display_text_at(200-strlen(str_display)*8, 200-8, str_display);
-                free(str_display);
-            } else {
-                ESP_LOGE(TAG, "Failed to open file: %s", path);
-                display_fill_white();
-                display_text_center_at(5, "IMAGE OPEN ERROR");
-            }
-            free(path);
+    if (drawing) {
+        ESP_LOGW(TAG, "Already drawing");
+        return;
+    }
+    drawing = true;
+    size_t total_bytes, used_bytes;
+    esp_littlefs_info("storage", &total_bytes, &used_bytes);
+    ESP_LOGI(TAG, "Total bytes: %d, Used bytes: %d", total_bytes, used_bytes);
+    uint16_t used_percent = (uint16_t)((float)used_bytes / total_bytes * 100);
+    if (used_percent > 99) used_percent = 99;
+    display_start(true);
+    if (barcode_file.name != NULL) {
+        ESP_LOGI(TAG, "Will draw file: %s", barcode_file.name);
+        char *path = malloc(strlen(BARCODES_PATH) + strlen(barcode_file.name) + 1);
+        strcpy(path, BARCODES_PATH);
+        strcat(path, barcode_file.name);
+        FILE *img_file = fopen(path, "rb");
+        if (img_file) {
+            display_show_bitmap_file(img_file, 200, 200);
+            fclose(img_file);
+            char *str_display = malloc(strlen(barcode_file.name) + 1 + 2);
+            strcpy(str_display, " ");
+            strcat(str_display, barcode_file.name);
+            strcat(str_display, " ");
+            display_text_center_at(5, str_display);
+            memset(str_display, 0, 5+1);
+            sprintf(str_display, " %d%%", 100-used_percent);
+            strcat(str_display, "\x80");
+            display_text_at(200-strlen(str_display)*8, 200-16, str_display);
+            memset(str_display, 0, 5+1);
+            strcat(str_display, " ");
+            uint8_t charge = battery_get_charge();
+            sprintf(str_display, " %02d%%\x7F", charge);
+            // strcat(str_display, "99%");
+            // strcat(str_display, "\x7F");
+            display_text_at(200-strlen(str_display)*8, 200-8, str_display);
+            free(str_display);
         } else {
-            ESP_LOGE(TAG, "No next file found");
+            ESP_LOGE(TAG, "Failed to open file: %s", path);
             display_fill_white();
-            display_text_center_at(5, "NO IMAGES");
+            display_text_center_at(5, "IMAGE OPEN ERROR");
         }
-        display_finish(true);
+        free(path);
+    } else {
+        ESP_LOGE(TAG, "No next file found");
+        display_fill_white();
+        display_text_center_at(5, "NO IMAGES");
+    }
+    display_finish(true);
+    drawing = false;
 }
