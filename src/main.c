@@ -53,8 +53,8 @@ static void power_init()
 {
     esp_pm_config_t pm_config = {
         .max_freq_mhz = 240,
-        .min_freq_mhz = 10,
-        .light_sleep_enable = false
+        .min_freq_mhz = 40,
+        .light_sleep_enable = true
     };
     esp_pm_configure(&pm_config);
 }
@@ -131,6 +131,7 @@ void app_main() {
     } else {
         // add delay to let touch pads charge settle?
         // otherwise touch pads raw values are too low
+        ESP_LOGI(TAG, "Wake up reason: %d", wakeup_reason);
         vTaskDelay(4000 / portTICK_PERIOD_MS);
         touchpad_init(touchpads_mask, false);
     }
@@ -140,10 +141,15 @@ void app_main() {
     apps_controller_add_app(&app_barcode);
     apps_controller_add_app(&app_bluetooth);
     if (wakeup_reason == ESP_SLEEP_WAKEUP_TOUCHPAD) {
-        if (wakeup_pin == TOUCHPAD_SELECT || wakeup_pin == TOUCHPAD_LEFT || wakeup_pin == TOUCHPAD_RIGHT) {
-            sleep_register_activity();
-            apps_controller_activate_app("barcode");
-        }
+        // if (wakeup_pin == TOUCHPAD_SELECT || wakeup_pin == TOUCHPAD_LEFT || wakeup_pin == TOUCHPAD_RIGHT) {
+        //     sleep_register_activity();
+        //     apps_controller_activate_app("barcode");
+        // } else {
+        //     // back to sleep if wrong touch pad triggered
+        //     sleep_deep();
+        // }
+        sleep_register_activity();
+        apps_controller_activate_app("barcode");
     } else {
         apps_controller_activate_app("menu");
     }
