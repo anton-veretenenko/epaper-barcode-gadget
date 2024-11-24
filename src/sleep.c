@@ -34,6 +34,8 @@ bool sleep_deep()
         if (on_sleep_event != NULL) {
             on_sleep_event();
         }
+        // disable all sources first (light sleep may use timer wake up)
+        esp_sleep_disable_wakeup_source(ESP_SLEEP_WAKEUP_ALL);
         esp_sleep_enable_touchpad_wakeup();
         esp_deep_sleep_start();
         return true; // never reached
