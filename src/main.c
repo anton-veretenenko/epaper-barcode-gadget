@@ -86,6 +86,7 @@ static void on_sleep_event()
 {
     // switch app to barcode before sleep
     apps_controller_activate_app("barcode");
+    display_deinit();
 }
 
 static void main_task(void *)

@@ -289,15 +289,15 @@ void display_init()
 
 void display_deinit()
 {
+    display_sleep();
     spi_bus_remove_device(display_spi_device);
     spi_bus_free(SPI2_HOST);
-    gpio_config_t io_conf;
-    io_conf.mode = GPIO_MODE_DISABLE;
-    io_conf.pin_bit_mask = (1ULL << DISPLAY_PIN_CS) | (1ULL << DISPLAY_PIN_DC) | (1ULL << DISPLAY_PIN_RES);
-    gpio_config(&io_conf);
-    io_conf.mode = GPIO_MODE_DISABLE;
-    io_conf.pin_bit_mask = (1ULL << DISPLAY_PIN_BUSY);
-    gpio_config(&io_conf);
+    gpio_reset_pin(DISPLAY_PIN_CS);
+    gpio_reset_pin(DISPLAY_PIN_DC);
+    gpio_reset_pin(DISPLAY_PIN_RES);
+    gpio_reset_pin(DISPLAY_PIN_BUSY);
+    gpio_reset_pin(DISPLAY_PIN_CLK);
+    gpio_reset_pin(DISPLAY_PIN_DATA);
 }
 
 bool display_busy()
