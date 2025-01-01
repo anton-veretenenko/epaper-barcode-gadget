@@ -89,7 +89,7 @@ void touchpad_init(uint16_t touchpad_mask, bool sleep_wakeup)
                 while (touch_value == 0) touch_pad_read_filtered(i, &touch_value);
                 ESP_LOGI(TAG, "touch pad %d no touch value: %d", i, touch_value);
                 // touch_pad_set_thresh(i, touch_value * 2.5f / 4);
-                touch_threshold = touch_value - 40;
+                touch_threshold = touch_value - 45;
                 if (ESP_OK != nvs_set_u16(nvs_touch_handle, key, touch_threshold))
                     ESP_LOGE(TAG, "Failed to save touch threshold: %s", key);
             } else {
